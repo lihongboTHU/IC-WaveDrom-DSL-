@@ -17,7 +17,7 @@
 
 ## 核心特性
 
-- **100% 自动化合成工业级数据集**：摒弃高成本人工标注，内置工业总线协议引擎（SPI, I2C, Memory等），支持7种物理视觉退化（透视失真、散焦、高频噪声、水印等），实现海量、多样且绝对准确的数据集构建。
+- **自动化合成训练集与高精度人工标注评估集**：**针对训练集**，利用内置工业总线协议引擎（SPI, I2C, Memory等）实现自动化合成，摒弃高成本人工标注，支持7种物理视觉退化（透视失真、散焦、高频噪声、水印等），实现海量且绝对准确的数据构建；**针对评估集**，严格收集真实工业场景截图与拍照，并由进行高精度人工标注，利用标注的标签在wavedrom中绘制出波形，保证绘制出的波形与原波形相同，保证标注的准确性。
 - **特定的容错评估机制**：基于编辑距离的波形特征相似度算法，支持超长序列截断自动闭合修复、行级($i$ to $i$)智能对齐与幻觉/漏识别动态惩罚，真实反映模型的视觉逻辑水平。
 - **端到端多模态转译**：一张图输入，直接输出包含名称（Name）、波形逻辑（Wave）与总线数据（Data）的结构化 JSON。
 
@@ -58,12 +58,13 @@ your_project_root/
 </div>
 
 ### 2. 评估结果统计
-我们基于自定义的评估系统（融合了 Name、Wave、Data 的动态加权及最大行数惩罚）对模型进行了测试。模型在不同难度等级（Easy / Medium / Hard）的数据集上均表现出了一定的转译能力：
+基于自定义的评估系统（融合了 Name、Wave、Data 的动态加权及最大行数惩罚）对模型进行了测试。原基座模型(PaddleOCR-VL和PaddleOCR-VL1.5)没有任何转译能力，其只能够输出图片中包含的一些字母名称，不会输出完整的wavedrom格式数据，**如果按照定义的评估系统进行评估则准确率全部为0**。lora微调后的模型在不同难度等级（Easy / Medium / Hard）的数据集上均表现出了一定的转译能力：
 
 <div align="center">
-  <img src="./docs/评估结果统计.png" alt="Evaluation Result" width="80%">
+  <img src="./docs/不同基座模型微调后准确率对比.png" alt="Evaluation Result" width="80%">
 </div>
 
+从结果上来看PaddleOCR-VL模型比PaddleOCR-VL1.5模型更适合本次任务。
 
 ## 🚀 快速开始
 
@@ -99,6 +100,10 @@ snapshot_download(
 ```bash
 python ./demo/demo.py
 ```
+也可运行`app.py`文件，可得到测试网页
+<div align="center">
+  <img src="./docs/应用网页示例.png" alt="Evaluation Result" width="80%">
+</div>
 
 ### 3. 运行评估脚本
 用浏览器打开百度飞桨 AI Studio 平台链接：[点击此处前往下载](https://aistudio.baidu.com/dataset/detail/383156/file)。下载压缩包并解压，压缩包中images.zip是评估集图片，解压后放在dataset中，annotations.jsonl文件是标签，也放在dataset中。
