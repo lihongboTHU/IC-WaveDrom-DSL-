@@ -49,14 +49,22 @@ your_project_root/
 
 本模型基于 `PaddlePaddle/PaddleOCR-VL` 进行微调。在微调之前，原基础模型只能读取图片中的基础文字，对图片中的波形结构完全无法理解，**对波形逻辑的读取准确率基本为 0**。由于算力限制原因，本次微调选用lora微调。经过专有时序图数据集的微调，模型能够成功读取图片波形的时序信息并且转成wavedrom格式数据。
 
-### 1. 训练损失与困惑度 (Loss & PPL)
+<!-- ### 1. 训练损失与困惑度 (Loss & PPL)
 训练过程平稳收敛，模型对时序 DSL 的预测能力显著提升：
 
 <div align="center">
   <img src="./docs/train_loss.png" alt="train loss" width="45%">
   <img src="./docs/train_ppl.png" alt="train ppl" width="45%">
-</div>
+</div> -->
 
+### 1. 训练
+本次采用分阶段训练方法：
+```text
+Stage 1: 只输出 signal name，学习行结构和信号名
+Stage 2: 使用 easy 样本学习完整 WaveDrom JSON
+Stage 3: 加入 medium 样本进行训练
+Stage 4: 使用全量样本 进行训练
+```
 ### 2. 评估结果统计
 基于自定义的评估系统（融合了 Name、Wave、Data 的动态加权及最大行数惩罚）对模型进行了测试。原基座模型(PaddleOCR-VL和PaddleOCR-VL1.5)没有任何转译能力，其只能够输出图片中包含的一些字母名称，不会输出完整的wavedrom格式数据，**如果按照定义的评估系统进行评估则准确率全部为0**。lora微调后的模型在不同难度等级（Easy / Medium / Hard）的数据集上均表现出了一定的转译能力：
 
@@ -64,7 +72,10 @@ your_project_root/
   <img src="./docs/不同基座模型微调后准确率对比.png" alt="Evaluation Result" width="80%">
 </div>
 
-从结果上来看PaddleOCR-VL模型比PaddleOCR-VL1.5模型更适合本次任务。
+<div align="center">
+  <img src="./docs/不同微调策略模型准确率对比.png" alt="Evaluation Result" width="80%">
+</div>
+从结果上来看PaddleOCR-VL模型比PaddleOCR-VL1.5模型更适合本次任务，并且分阶段训练有更好的训练效果。
 
 ## 🚀 快速开始
 

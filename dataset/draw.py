@@ -19,8 +19,9 @@ complexities = []
 seq_lengths = []
 num_signals_list = []
 data_validity = {"Hex Data": 0, "Empty Data (Noise)": 0}
+data_box_styles = Counter()
 
-print("🔍 正在扫描数据集...")
+print("Scanning dataset...")
 valid_files = [f for f in os.listdir(label_dir) if f.endswith(".txt")]
 
 for filename in valid_files:
@@ -46,9 +47,13 @@ for filename in valid_files:
     complexities.append(complexity_score)
     
     # 协议推断
-    if any("SDA" in n for n in names): protocols.append("I2C Bus")
-    elif any("MOSI" in n for n in names): protocols.append("SPI Bus")
-    elif any("ADDR" in n for n in names): protocols.append("Memory R/W")
+    upper_names = [n.upper() for n in names]
+    if any("SDA" in n or "SDIO" in n for n in upper_names):
+        protocols.append("I2C Bus")
+    elif any(n in upper_names for n in ["MOSI", "MISO", "SDI", "SDO", "DIN", "DOUT", "SI", "SO"]):
+        protocols.append("SPI Bus")
+    elif any("ADDR" in n or "ADDRESS" in n or "A[" in n or "DQ[" in n for n in upper_names):
+        protocols.append("Memory R/W")
     else: protocols.append("Mixed/Custom")
 
     for sig in signals:
@@ -60,19 +65,28 @@ for filename in valid_files:
         tokens.update(list(wave))
         
         # 统计类别
-        if any(k in name for k in ["CLK", "SCK", "SCL", "TCK"]):
+        upper_name = name.upper()
+        if any(k in upper_name for k in ["CLK", "SCK", "SCL", "TCK", "BCLK", "MCLK", "LRCLK"]):
             categories.append("Clock (CLK)")
-        elif any(k in name for k in ["DAT", "MOSI", "MISO", "SDA", "RX", "TX", "DQ", "D0", "ADDR"]):
+        elif any(k in upper_name for k in ["DAT", "DATA", "MOSI", "MISO", "SDA", "SDIO", "RX", "TX", "DQ", "D0", "ADDR", "ADDRESS", "A["]):
             categories.append("Data Bus")
         else:
             categories.append("Control/Other")
+
+        if "=" in wave:
+            if "=." not in wave:
+                data_box_styles["Per-cycle boxes"] += 1
+            elif wave.count("=") == 1:
+                data_box_styles["Single large box"] += 1
+            else:
+                data_box_styles["Chunked boxes"] += 1
             
         # 统计 Data 真实性
         for d in data_list:
             if d.strip() == "": data_validity["Empty Data (Noise)"] += 1
             else: data_validity["Hex Data"] += 1
 
-print(f"✅ 成功分析 {len(valid_files)} 条数据，正在生成可视化图表...")
+print(f"Analyzed {len(valid_files)} samples. Drawing charts...")
 
 # ==========================================
 # 2. 绘制可视化大屏 (Dashboard)
@@ -95,7 +109,7 @@ axes[0, 1].set_title('2. Hardware Protocol Coverage', fontweight='bold')
 
 # --- 图3: 词表长尾分布 (证明特征丰富度) ---
 tokens_df = pd.DataFrame(tokens.items(), columns=['Token', 'Count']).sort_values(by='Count', ascending=False)
-sns.barplot(data=tokens_df, x='Token', y='Count', ax=axes[0, 2], palette="viridis")
+sns.barplot(data=tokens_df, x='Token', y='Count', hue='Token', ax=axes[0, 2], palette="viridis", legend=False)
 axes[0, 2].set_yscale("log")
 axes[0, 2].set_title('3. Wave Token Frequency (Log Scale)', fontweight='bold')
 
@@ -145,13 +159,17 @@ if hard_x <= hard_threshold:
     hard_x = hard_threshold + (x_max - hard_threshold) * 0.1
 axes[1, 1].text(hard_x, y_top, 'Hard', ha='center', color='black', fontweight='bold')
 
-# --- 图6: 有效数据密度 ---
-axes[1, 2].bar(data_validity.keys(), data_validity.values(), color=['#4CAF50', '#FF9800'])
-axes[1, 2].set_title('6. Payload Data Validity Ratio', fontweight='bold')
-for i, v in enumerate(data_validity.values()):
-    axes[1, 2].text(i, v + max(data_validity.values())*0.02, str(v), ha='center', fontweight='bold')
+# --- 图6: Data box 风格覆盖 ---
+style_order = ["Per-cycle boxes", "Single large box", "Chunked boxes"]
+style_values = [data_box_styles.get(k, 0) for k in style_order]
+axes[1, 2].bar(style_order, style_values, color=sns.color_palette("Set2", n_colors=3))
+axes[1, 2].set_title('6. Data Box Style Coverage', fontweight='bold')
+axes[1, 2].tick_params(axis='x', rotation=12)
+max_style = max(style_values) if style_values else 1
+for i, v in enumerate(style_values):
+    axes[1, 2].text(i, v + max_style * 0.02, str(v), ha='center', fontweight='bold')
 
 plt.tight_layout(rect=[0, 0, 1, 0.95])
 output_file = 'dataset_scientific_analysis.png'
 plt.savefig(output_file, dpi=300)
-print(f"🎉 统计图表已生成完毕！请查看当前目录下的：{output_file}")
+print(f"Dataset analysis chart saved to: {output_file}")

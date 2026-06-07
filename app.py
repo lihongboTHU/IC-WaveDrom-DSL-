@@ -5,6 +5,7 @@ from paddleformers.transformers import AutoModelForConditionalGeneration, AutoPr
 from paddleformers.generation import GenerationConfig
 import json
 import re
+from wavedrom_repair import DEFAULT_WAVEDROM_PROMPT, repair_wavedrom_json
 
 # 加载模型逻辑与 demo.py 保持一致
 model_path = "./IC-WaveDrom-DSL"
@@ -45,7 +46,7 @@ def process_image(image_pil):
             "role": "user",
             "content": [
                 {"type": "image", "image": image},
-                {"type": "text", "text": "WaveDrom Recognition:"},
+                {"type": "text", "text": DEFAULT_WAVEDROM_PROMPT},
             ]
         }
     ]
@@ -59,11 +60,10 @@ def process_image(image_pil):
         outputs = model.generate(**inputs, generation_config=generation_config)
         output_text = processor.decode(outputs[0].tolist()[0], skip_special_tokens=True)
     
-    # 尝试提取 JSON 部分
-    json_str = output_text
-    match = re.search(r"```json\n(.*?)\n```", output_text, re.DOTALL)
-    if match:
-        json_str = match.group(1)
+    # 修复常见的截断、重复 data、Markdown fence 和局部 JSON 键名错误。
+    json_str, repaired_obj, repair_info = repair_wavedrom_json(output_text)
+    if repaired_obj is None:
+        json_str = output_text
         
     # 为了让 WaveDrom 渲染，我们需要构建 HTML 字符串嵌入
     html_content = f"""
@@ -78,7 +78,7 @@ def process_image(image_pil):
     </div>
     """
     
-    return output_text, html_content
+    return json_str, html_content
 
 # 构建 Gradio 界面
 with gr.Blocks(title="IC WaveDrom DSL 转译系统") as demo:

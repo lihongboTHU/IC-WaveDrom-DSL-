@@ -10,17 +10,24 @@ from paddleformers.transformers import (
 )
 from paddleformers.generation import GenerationConfig
 
-"""
-模型评估脚本，用来获取评估集得分。评估标准见docs文件夹
-评估集标签需要放在dataset文件夹中，名称为annotations.jsonl
-"""
-
 # =========================================================
 # 1. 模型加载
 # =========================================================
 
-# 微调模型
-model_path = "./IC-WaveDrom-DSL" # 微调后的模型
+# 基于paddleOCR-VL的微调模型
+# model_path = "./PaddleOCR-VL-SFT-WaveDrom-LoRA/export"
+
+# 基于paddleOCR-VL1.5的微调模型
+# model_path = "./output_PaddleOCR-VL-1.5-SFT-ICOCR-lora_withTextIntensify_model/export"
+
+# 原始模型
+# model_path = "./PaddlePaddle/PaddleOCR-VL" 
+
+# model_path = "./PaddleOCR-VL-SFT-IC-lora_model2/export" # 多轮训练+高秩lora微调结果损失函数
+
+# model_path = "./output_PaddleOCR-VL-1.5-SFT-ICOCR-lora_model2/export" # 多轮训练+高秩lora微调结果损失函数 + 大规模数据增强（文本增强） + 权重合并（merge）
+
+model_path = "./output_lora_stage4_full/export"
 
 model = AutoModelForConditionalGeneration.from_pretrained(
     model_path,
@@ -33,10 +40,13 @@ model.visual.config._attn_implementation = "flashmask"
 processor = AutoProcessor.from_pretrained(model_path)
 
 generation_config = GenerationConfig(
-    do_sample=False,
-    max_new_tokens=1024,
+    do_sample=True,         # 开启采样
+    temperature=0.1,        # 极低的温度，几乎等同于贪婪解码，但保留了一丝随机性
+    top_p=0.9,
+    max_new_tokens=2048,
     pad_token_id=0,
-    eos_token_id=2
+    eos_token_id=2,
+    repetition_penalty=1.1
 )
 
 # =========================================================
@@ -184,7 +194,7 @@ def evaluate(gt_obj, pred_obj):
 # 4. 推理函数
 # =========================================================
 
-def inference_one(image_path, prompt="WaveDrom Recognition:"):
+def inference_one(image_path, prompt="Return only one valid WaveDrom JSON object. Do not output extra signals. Do not include time-axis labels."):
     image = Image.open(image_path).convert("RGB")
     messages = [
         {
@@ -221,7 +231,7 @@ def inference_one(image_path, prompt="WaveDrom Recognition:"):
 # 5. 批量评估
 # =========================================================
 
-jsonl_path = "./dataset/annotations.jsonl"
+jsonl_path = "./dataset/eval_messages_labeled.jsonl"
 
 all_results = []
 overall_scores = []
@@ -317,7 +327,7 @@ print("=================================================")
 # 7. 保存结果
 # =========================================================
 
-with open("eval_results.json", "w", encoding="utf-8") as f:
+with open("eval_results2.json", "w", encoding="utf-8") as f:
     json.dump(all_results, f, ensure_ascii=False, indent=2)
 
 print("\n详细评测结果已保存到 eval_results.json")

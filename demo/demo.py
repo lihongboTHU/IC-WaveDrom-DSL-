@@ -2,6 +2,11 @@ import paddle
 from PIL import Image
 from paddleformers.transformers import AutoModelForConditionalGeneration, AutoProcessor
 from paddleformers.generation import GenerationConfig
+import os
+import sys
+
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+from wavedrom_repair import DEFAULT_WAVEDROM_PROMPT, repair_wavedrom_json
 
 model_path = "./IC-WaveDrom-DSL" 
 image = Image.open("./dataset/images/blur_001.png").convert("RGB") # 测试一张图片,请替换为你自己的图片路径
@@ -21,7 +26,7 @@ messages = [
         "role": "user",
         "content": [
             {"type": "image", "image": image},
-            {"type": "text", "text": "WaveDrom Recognition:"},
+            {"type": "text", "text": DEFAULT_WAVEDROM_PROMPT},
         ]
     }
 ]
@@ -42,4 +47,7 @@ with paddle.no_grad():
     outputs = model.generate(**inputs, generation_config=generation_config)
     output_text = processor.decode(outputs[0].tolist()[0], skip_special_tokens=True)
 
-print(output_text)
+json_text, pred_obj, repair_info = repair_wavedrom_json(output_text)
+print(json_text if pred_obj is not None else output_text)
+if repair_info.get("used_repair"):
+    print(f"Repair method: {repair_info['method']}")
